@@ -74,13 +74,13 @@ const AnalyticsPage: React.FC = () => {
   }, [clicks, timeRange]);
 
   const clickCountsByType = useMemo(() => {
-    // Fix: Explicitly type the accumulator's initial value in `reduce` to ensure TypeScript
-    // correctly infers the types for the `counts` object and its values.
-    const counts = filteredClicks.reduce((acc, click) => {
+    // Fix: Use a generic type argument for `reduce` to ensure TypeScript correctly
+    // infers the accumulator type, preventing type errors in subsequent operations.
+    const counts = filteredClicks.reduce<Record<string, number>>((acc, click) => {
       const type = click.type.charAt(0).toUpperCase() + click.type.slice(1);
       acc[type] = (acc[type] || 0) + 1;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
 
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))
@@ -88,11 +88,11 @@ const AnalyticsPage: React.FC = () => {
   }, [filteredClicks]);
 
   const clickDataForChart = useMemo(() => {
-    const clicksByDate = filteredClicks.reduce((acc, click) => {
+    const clicksByDate = filteredClicks.reduce<Record<string, number>>((acc, click) => {
       const date = new Date(click.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD
       acc[date] = (acc[date] || 0) + 1;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
 
     return Object.entries(clicksByDate)
       .map(([date, clicks]) => ({ date, clicks }))
