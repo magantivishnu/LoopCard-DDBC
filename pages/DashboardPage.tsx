@@ -16,10 +16,31 @@ const DashboardPage: React.FC = () => {
 
   const maxCards = user?.tier === UserTier.Pro ? 5 : 2;
 
-  const handleShare = (cardId: string) => {
-    const url = `${window.location.origin}/#/card/${cardId}`;
-    navigator.clipboard.writeText(url);
-    alert(t('dashboard_share_success', { url }));
+  const handleShare = async (cardId: string) => {
+    const baseUrl = window.location.href.split('#')[0];
+    const url = `${baseUrl}#/card/${cardId}`;
+    const shareData = {
+      title: t('appName'),
+      text: `Check out my digital business card from ${t('appName')}!`,
+      url: url,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback for browsers that don't support the Web Share API
+        navigator.clipboard.writeText(url);
+        alert(t('dashboard_share_success', { url }));
+      }
+    } catch (err: any) {
+      console.error('Error sharing:', err);
+      // Fallback if sharing fails or is cancelled by the user (e.g., AbortError).
+      if (err.name !== 'AbortError') {
+           navigator.clipboard.writeText(url);
+           alert(t('dashboard_share_success', { url }));
+      }
+    }
   };
 
   const ActionButton: React.FC<{ onClick: () => void; className: string; children: React.ReactNode; }> = ({ onClick, className, children }) => (
@@ -33,7 +54,6 @@ const DashboardPage: React.FC = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-text">{t('dashboard_welcome', { email: user?.email || '' })}</h1>
-          <p className="text-muted">{t('dashboard_yourTier')} <span className="font-semibold text-primary">{user?.tier}</span></p>
         </div>
         {cards.length < maxCards && (
           <Link

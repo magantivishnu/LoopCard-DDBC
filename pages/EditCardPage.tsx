@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/useAppContext';
@@ -5,6 +6,7 @@ import { CardData, UserTier, SocialLink } from '../types';
 import ToggleSwitch from '../components/ToggleSwitch';
 import { useTranslation } from '../hooks/useTranslation';
 import Spinner from '../components/Spinner';
+import { suggestUsernames } from '../services/geminiService';
 
 const PREDEFINED_PLATFORMS = ['linkedin', 'twitter', 'instagram', 'github', 'facebook', 'youtube', 'tiktok'];
 
@@ -21,6 +23,9 @@ const EditCardPage: React.FC = () => {
 
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [bannerPhotoFile, setBannerPhotoFile] = useState<File | null>(null);
+
+  const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
+  const [suggestionLoading, setSuggestionLoading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     const fetchCard = async () => {
@@ -96,6 +101,34 @@ const EditCardPage: React.FC = () => {
     setCard({ ...card, socials: card.socials.filter((_, i) => i !== index) });
   };
 
+  const handleSuggestUsernames = async (index: number) => {
+    if (!card) return;
+    setSuggestionLoading(prev => ({ ...prev, [index]: true }));
+    setSuggestions(prev => ({ ...prev, [index]: [] }));
+
+    const platform = card.socials[index].platform;
+    
+    try {
+        const result = await suggestUsernames(
+            card.full_name,
+            card.role,
+            card.business_name,
+            platform
+        );
+        setSuggestions(prev => ({ ...prev, [index]: result }));
+    } catch (error) {
+        console.error("Failed to get suggestions", error);
+        alert("Could not get suggestions at this time.");
+    } finally {
+        setSuggestionLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const handleSelectSuggestion = (index: number, suggestion: string) => {
+      handleSocialChange(index, 'username', suggestion);
+      setSuggestions(prev => ({ ...prev, [index]: [] }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!card) return;
@@ -104,22 +137,21 @@ const EditCardPage: React.FC = () => {
     try {
       let finalCard = { ...card };
       if (profilePhotoFile) {
-        // Fix: Pass the data URL from finalCard.profile_photo instead of the File object.
         const url = await uploadAsset(finalCard.profile_photo);
         if (!url) throw new Error("Failed to upload profile photo.");
         finalCard.profile_photo = url;
       }
       if (bannerPhotoFile) {
-        // Fix: Pass the data URL from finalCard.banner_photo instead of the File object.
         const url = await uploadAsset(finalCard.banner_photo);
         if (!url) throw new Error("Failed to upload banner photo.");
         finalCard.banner_photo = url;
       }
       await updateCard(finalCard);
+      // On success, navigate away. The component will unmount, so we don't need to set saving to false.
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to update card.');
-    } finally {
+      // On error, stop saving so the user can see the error and try again.
       setSaving(false);
     }
   };
@@ -179,13 +211,57 @@ const EditCardPage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4">{t('setup_progress_step3')}</h2>
             <div className="space-y-3">
                 {card.socials.map((social, index) => (
-                    <div key={social.id} className="flex items-center space-x-2">
+                    <div key={social.id} className="space-y-2">
+                      <div className="flex items-center space-x-2">
                         <select value={PREDEFINED_PLATFORMS.includes(social.platform) ? social.platform : 'Other'} onChange={(e) => handleSocialChange(index, 'platform', e.target.value === 'Other' ? 'Other' : e.target.value)} className="p-2 border rounded-md capitalize bg-white flex-shrink-0">
                             {PREDEFINED_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)} <option value="Other">Other...</option>
                         </select>
-                        <input type="text" value={social.username} onChange={(e) => handleSocialChange(index, 'username', e.target.value)} placeholder={PREDEFINED_PLATFORMS.includes(social.platform) ? "Username" : "Full URL"} className="flex-grow p-2 border rounded-md min-w-0" />
+                        <div className="relative flex-grow">
+                          <input type="text" value={social.username} onChange={(e) => handleSocialChange(index, 'username', e.target.value)} placeholder={PREDEFINED_PLATFORMS.includes(social.platform) ? "Username" : "Full URL"} className="w-full p-2 border rounded-md min-w-0 pr-28" />
+                          {PREDEFINED_PLATFORMS.includes(social.platform) && (
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                  {user?.tier === UserTier.Pro ? (
+                                      <button
+                                          type="button"
+                                          onClick={() => handleSuggestUsernames(index)}
+                                          disabled={suggestionLoading[index]}
+                                          className="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded-md hover:bg-purple-200 disabled:opacity-50 flex items-center"
+                                      >
+                                          {suggestionLoading[index] ? '...' : '✨ Suggest'}
+                                      </button>
+                                  ) : (
+                                      <div className="relative group">
+                                          <button type="button" disabled className="bg-slate-200 text-slate-500 text-xs font-semibold px-2 py-1 rounded-md cursor-not-allowed">
+                                              ✨ Suggest <span className="text-yellow-500">Pro</span>
+                                          </button>
+                                          <div className="absolute bottom-full z-10 mb-2 hidden group-hover:block w-40 bg-slate-800 text-white text-xs rounded py-1 px-2 text-center">
+                                              Upgrade to Pro for AI suggestions!
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                        </div>
                         <div className="flex-shrink-0"><ToggleSwitch enabled={social.enabled} onChange={() => handleSocialToggle(index)} /></div>
                         <button type="button" onClick={() => removeSocialLink(index)} className="text-red-500 hover:text-red-700 font-bold text-2xl p-1 flex-shrink-0 leading-none">&times;</button>
+                      </div>
+                      {suggestions[index] && suggestions[index].length > 0 && (
+                          <div className="ml-36 p-2 bg-slate-50 border rounded-md animate-fade-in">
+                              <p className="text-xs font-semibold mb-2 text-muted">Tap to use a suggestion:</p>
+                              <div className="flex flex-wrap gap-2">
+                                  {suggestions[index].map(s => (
+                                      <button
+                                          key={s}
+                                          type="button"
+                                          onClick={() => handleSelectSuggestion(index, s)}
+                                          className="bg-white border text-slate-700 text-sm px-3 py-1 rounded-full hover:bg-primary hover:text-white transition-colors"
+                                      >
+                                          {s}
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      )}
                     </div>
                 ))}
             </div>

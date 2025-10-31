@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/useAppContext';
 import { UserTier } from '../types';
@@ -16,6 +16,18 @@ const LoginPage: React.FC = () => {
   const [tier, setTier] = useState<UserTier>(UserTier.Free);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
+  useEffect(() => {
+    // Example hash: #/login?ref=12345
+    const hash = window.location.hash;
+    const searchParams = new URLSearchParams(hash.split('?')[1]);
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+        localStorage.setItem('referralCode', refCode);
+        console.log(`Referral code ${refCode} saved.`);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,19 +36,35 @@ const LoginPage: React.FC = () => {
     try {
       if (isSigningUp) {
         await signUp(email, password, tier);
-        // Supabase will redirect or trigger onAuthStateChange
-        // For email confirmation flows, you'd show a message here.
-        alert("Sign up successful! Please check your email to confirm your account.");
+        setSignupSuccess(true);
       } else {
         await login(email, password);
+        navigate('/dashboard');
       }
-      navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      // Provide more specific feedback for the most common login failure after signup.
+      if (err.message && err.message.toLowerCase().includes('email not confirmed')) {
+        setError('Your email is not confirmed yet. Please click the link we sent to your inbox. It might take a moment for the confirmation to register.');
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
     } finally {
         setLoading(false);
     }
   };
+
+  if (signupSuccess) {
+    return (
+        <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-md w-full space-y-4 bg-card p-10 rounded-xl shadow-lg border border-slate-200 text-center">
+                <h2 className="text-3xl font-extrabold text-secondary">Sign Up Successful!</h2>
+                <p className="text-muted">We've sent a confirmation link to:</p>
+                <p className="font-semibold text-text break-all">{email}</p>
+                <p className="text-muted">Please click the link in the email to activate your account before signing in.</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

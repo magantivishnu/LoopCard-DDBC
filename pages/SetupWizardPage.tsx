@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/useAppContext';
 import { CardData, UserTier, SocialLink } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
 import Spinner from '../components/Spinner';
+import { suggestUsernames } from '../services/geminiService';
 
 type FormData = Omit<CardData, 'id' | 'user_id' | 'qr_code_url' | 'created_at'>;
 const PREDEFINED_PLATFORMS = ['linkedin', 'twitter', 'instagram', 'github', 'facebook', 'youtube', 'tiktok'];
@@ -51,6 +53,9 @@ const SetupWizardPage: React.FC = () => {
 
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [bannerPhotoFile, setBannerPhotoFile] = useState<File | null>(null);
+
+  const [suggestions, setSuggestions] = useState<Record<number, string[]>>({});
+  const [suggestionLoading, setSuggestionLoading] = useState<Record<number, boolean>>({});
 
   const [formData, setFormData] = useState<FormData>({
     profile_photo: `https://i.pravatar.cc/150?u=newuser_${Date.now()}`,
@@ -109,6 +114,33 @@ const SetupWizardPage: React.FC = () => {
     setFormData(prev => ({ ...prev, socials: prev.socials.filter((_, i) => i !== index) }));
   };
 
+  const handleSuggestUsernames = async (index: number) => {
+    setSuggestionLoading(prev => ({ ...prev, [index]: true }));
+    setSuggestions(prev => ({ ...prev, [index]: [] }));
+
+    const platform = formData.socials[index].platform;
+    
+    try {
+        const result = await suggestUsernames(
+            formData.full_name,
+            formData.role,
+            formData.business_name,
+            platform
+        );
+        setSuggestions(prev => ({ ...prev, [index]: result }));
+    } catch (error) {
+        console.error("Failed to get suggestions", error);
+        alert("Could not get suggestions at this time.");
+    } finally {
+        setSuggestionLoading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const handleSelectSuggestion = (index: number, suggestion: string) => {
+      handleSocialChange(index, 'username', suggestion);
+      setSuggestions(prev => ({ ...prev, [index]: [] }));
+  };
+
   const handleNext = () => {
     if (step === 1 && !formData.full_name.trim()) {
         alert("Full name is mandatory.");
@@ -123,40 +155,31 @@ const SetupWizardPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    console.log("Submitting form...");
 
     try {
       let finalData = { ...formData };
       
       if (profilePhotoFile) {
-        console.log("Uploading profile photo...");
-        // Fix: Pass the data URL from finalData.profile_photo instead of the File object.
         const url = await uploadAsset(finalData.profile_photo);
         if (!url) throw new Error("Failed to upload profile photo.");
         finalData.profile_photo = url;
-        console.log("Profile photo uploaded successfully.");
       }
 
       if (bannerPhotoFile) {
-        console.log("Uploading banner photo...");
-        // Fix: Pass the data URL from finalData.banner_photo instead of the File object.
         const url = await uploadAsset(finalData.banner_photo);
         if (!url) throw new Error("Failed to upload banner photo.");
         finalData.banner_photo = url;
-        console.log("Banner photo uploaded successfully.");
       }
 
-      console.log("Adding card to database...");
       await addCard(finalData);
-      console.log("Card added successfully. Navigating to dashboard.");
       
+      // On success, navigate away. The component will unmount, so we don't need to set loading to false.
       navigate('/dashboard');
     } catch (err: any) {
       console.error("Error during card creation:", err);
       setError(err.message || 'Failed to save card.');
-    } finally {
+      // On error, stop loading so the user can see the error and try again.
       setLoading(false);
-      console.log("Submission process finished.");
     }
   };
   
@@ -200,23 +223,67 @@ const SetupWizardPage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4">{t('setup_progress_step3')}</h2>
             <div className="space-y-3">
               {formData.socials.map((social, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <select
-                    value={social.platform}
-                    onChange={(e) => handleSocialChange(index, 'platform', e.target.value)}
-                    className="p-2 border rounded-md capitalize flex-shrink-0"
-                  >
-                    {PREDEFINED_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                    <option value="Other">Other...</option>
-                  </select>
-                  <input
-                    type="text"
-                    value={social.username}
-                    onChange={(e) => handleSocialChange(index, 'username', e.target.value)}
-                    placeholder={social.platform === 'Other' ? "Full URL (e.g., https://...)" : "Username"}
-                    className="flex-grow p-2 border rounded-md min-w-0"
-                  />
-                  <button type="button" onClick={() => removeSocialLink(index)} className="text-red-500 hover:text-red-700 p-2 flex-shrink-0 font-bold text-2xl leading-none">&times;</button>
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <select
+                      value={social.platform}
+                      onChange={(e) => handleSocialChange(index, 'platform', e.target.value)}
+                      className="p-2 border rounded-md capitalize flex-shrink-0"
+                    >
+                      {PREDEFINED_PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                      <option value="Other">Other...</option>
+                    </select>
+                    <div className="relative flex-grow">
+                      <input
+                        type="text"
+                        value={social.username}
+                        onChange={(e) => handleSocialChange(index, 'username', e.target.value)}
+                        placeholder={social.platform === 'Other' ? "Full URL (e.g., https://...)" : "Username"}
+                        className="w-full p-2 border rounded-md min-w-0 pr-24"
+                      />
+                      {social.platform !== 'Other' && (
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                          {user?.tier === UserTier.Pro ? (
+                              <button
+                                  type="button"
+                                  onClick={() => handleSuggestUsernames(index)}
+                                  disabled={suggestionLoading[index]}
+                                  className="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded-md hover:bg-purple-200 disabled:opacity-50 flex items-center"
+                              >
+                                  {suggestionLoading[index] ? '...' : '✨ Suggest'}
+                              </button>
+                          ) : (
+                              <div className="relative group">
+                                  <button type="button" disabled className="bg-slate-200 text-slate-500 text-xs font-semibold px-2 py-1 rounded-md cursor-not-allowed">
+                                      ✨ Suggest <span className="text-yellow-500">Pro</span>
+                                  </button>
+                                  <div className="absolute bottom-full z-10 mb-2 hidden group-hover:block w-40 bg-slate-800 text-white text-xs rounded py-1 px-2 text-center">
+                                      Upgrade to Pro for AI suggestions!
+                                  </div>
+                              </div>
+                          )}
+                          </div>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => removeSocialLink(index)} className="text-red-500 hover:text-red-700 p-2 flex-shrink-0 font-bold text-2xl leading-none">&times;</button>
+                  </div>
+                   {suggestions[index] && suggestions[index].length > 0 && (
+                      <div className="ml-36 p-2 bg-slate-50 border rounded-md animate-fade-in">
+                          <p className="text-xs font-semibold mb-2 text-muted">Tap to use a suggestion:</p>
+                          <div className="flex flex-wrap gap-2">
+                              {suggestions[index].map(s => (
+                                  <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => handleSelectSuggestion(index, s)}
+                                      className="bg-white border text-slate-700 text-sm px-3 py-1 rounded-full hover:bg-primary hover:text-white transition-colors"
+                                  >
+                                      {s}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  )}
                 </div>
               ))}
             </div>

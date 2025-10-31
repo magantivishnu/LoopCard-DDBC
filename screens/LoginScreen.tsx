@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useAppContext } from '../hooks/useAppContext';
@@ -13,6 +12,7 @@ const LoginScreen = () => {
   const [tier, setTier] = useState<UserTier>(UserTier.Free);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleSubmit = async () => {
     setError(null);
@@ -20,16 +20,34 @@ const LoginScreen = () => {
     try {
       if (isSigningUp) {
         await signUp(email, password, tier);
-        Alert.alert("Sign up successful!", "Please check your email to confirm your account.");
+        setSignupSuccess(true);
       } else {
         await login(email, password);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      // Provide more specific feedback for the most common login failure after signup.
+      if (err.message && err.message.toLowerCase().includes('email not confirmed')) {
+        setError('Your email is not confirmed yet. Please click the link we sent to your inbox. It might take a moment for the confirmation to register.');
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (signupSuccess) {
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={[styles.formContainer, { alignItems: 'center' }]}>
+                <Text style={styles.title}>Sign Up Successful!</Text>
+                <Text style={styles.successText}>We've sent a confirmation link to:</Text>
+                <Text style={[styles.successText, { fontWeight: 'bold', marginVertical: 8 }]}>{email}</Text>
+                <Text style={styles.successText}>Please click the link in the email to activate your account.</Text>
+            </View>
+        </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -86,7 +104,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC', justifyContent: 'center', padding: 20 },
   formContainer: { backgroundColor: 'white', padding: 25, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#0F172A' },
-  errorText: { color: 'red', textAlign: 'center', marginBottom: 10 },
+  errorText: { color: 'red', textAlign: 'center', marginBottom: 10, padding: 10, backgroundColor: '#FEE2E2', borderRadius: 6 },
+  successText: { fontSize: 16, textAlign: 'center', color: '#64748B', lineHeight: 24 },
   input: { borderWidth: 1, borderColor: '#CBD5E1', padding: 12, borderRadius: 8, fontSize: 16, marginBottom: 15 },
   tierSelector: { flexDirection: 'row', marginBottom: 20, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8 },
   tierButton: { flex: 1, padding: 12, alignItems: 'center' },

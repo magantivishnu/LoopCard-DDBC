@@ -8,7 +8,7 @@ import Spinner from '../components/Spinner';
 
 const PublicCardViewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { getCardById } = useAppContext();
+  const { getCardById, trackClick } = useAppContext();
   const [card, setCard] = useState<CardData | null>(null);
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
@@ -53,6 +53,7 @@ PHOTO;TYPE=JPEG:${card.profile_photo}
 END:VCARD`;
 
   const handleSaveContact = () => {
+    trackClick(card.id, 'save_contact', 'vcard.vcf');
     const blob = new Blob([vCardData], { type: 'text/vcard' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -79,8 +80,15 @@ END:VCARD`;
   
   const ContactButton: React.FC<{ href: string, icon: 'phone' | 'whatsapp' | 'email' | 'website', label: string, enabled: boolean }> = ({ href, icon, label, enabled }) => {
     if (!enabled || !href) return null;
+
+    const handleClick = () => {
+      if (card) {
+        trackClick(card.id, icon, href);
+      }
+    };
+
     return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`flex flex-col items-center justify-center p-4 rounded-lg transition space-y-2 ${CONTACT_COLORS[icon]}`}>
+        <a href={href} onClick={handleClick} target="_blank" rel="noopener noreferrer" className={`flex flex-col items-center justify-center p-4 rounded-lg transition space-y-2 ${CONTACT_COLORS[icon]}`}>
             <SocialIcon platform={icon} className="w-7 h-7" />
             <span className="font-semibold text-sm">{label}</span>
         </a>
@@ -110,8 +118,14 @@ END:VCARD`;
       displayPlatform = 'link';
     }
     
+    const handleClick = () => {
+      if (card) {
+        trackClick(card.id, platform.toLowerCase(), url);
+      }
+    };
+
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary transition">
+      <a href={url} onClick={handleClick} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary transition">
         <SocialIcon platform={displayPlatform} className="w-7 h-7" />
       </a>
     );

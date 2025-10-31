@@ -41,7 +41,15 @@ const Header: React.FC = () => {
 
           {/* Right side: Actions or placeholder for alignment */}
           <div className="w-1/3 flex justify-end">
-            {!user && (
+            {user ? (
+              <div className="flex items-center space-x-2">
+                <Link to="/scanner" className="text-muted hover:text-primary p-2 rounded-full" aria-label="Scan QR Code">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6.5 6.5v-1.5m-6.5 0V20m1-6.5H4m16.5 0h-1.5m-6.5-6.5v1.5m0-6.5V4M6 6h2v2H6V6zm10 10h2v2h-2v-2zm-5 0h2v2h-2v-2zm0-5h2v2h-2v-2zm-5 0h2v2H6v-2zm10 0h2v2h-2v-2zm0-5h2v2h-2V6zM6 11h2v2H6v-2zm5-5h2v2h-2V6z" />
+                  </svg>
+                </Link>
+              </div>
+            ) : (
               <div className="flex items-center space-x-2 sm:space-x-4">
                 <Link to="/login" className="text-muted hover:text-primary px-2 sm:px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap">
                   {t('header_signIn')}

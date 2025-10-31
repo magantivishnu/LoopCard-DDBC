@@ -1,41 +1,104 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../hooks/useAppContext';
-import { CardData, UserTier, AnalyticsData } from '../types';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { CardData, UserTier, AnalyticsData, Click } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { generateAnalyticsInsights } from '../services/geminiService';
 import Spinner from '../components/Spinner';
 import { useTranslation } from '../hooks/useTranslation';
 
 const AnalyticsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { getCardById, user } = useAppContext();
+  const { getCardById, user, getCardClicks } = useAppContext();
   const navigate = useNavigate();
   const { t } = useTranslation();
   
   const [card, setCard] = useState<CardData | null>(null);
   const [aiInsights, setAiInsights] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  // Fix: Added component-level loading state for fetching card data.
-  const [isCardLoading, setIsCardLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false); // For AI insights
+  const [isCardLoading, setIsCardLoading] = useState(true); // For initial card data
+  const [clicks, setClicks] = useState<Click[]>([]);
+  const [isClicksLoading, setIsClicksLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<number>(30); // Default to 30 days
 
   useEffect(() => {
-    // Fix: Correctly implemented async data fetching for card details.
-    const fetchCard = async () => {
-      if (id) {
-        setIsCardLoading(true);
+    let isMounted = true;
+
+    const fetchData = async () => {
+      if (!id) {
+        navigate('/analytics');
+        return;
+      }
+      
+      setIsCardLoading(true);
+      setIsClicksLoading(true);
+      try {
         const foundCard = await getCardById(id);
-        if (foundCard) {
-          setCard(foundCard);
-        } else {
-          navigate('/dashboard');
+        const clickData = await getCardClicks(id);
+        
+        if (isMounted) {
+          if (foundCard) {
+            setCard(foundCard);
+            setClicks(clickData);
+          } else {
+            console.warn(`Card with ID ${id} not found. Redirecting.`);
+            navigate('/analytics');
+          }
         }
-        setIsCardLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch analytics data:', error);
+        if (isMounted) {
+          navigate('/analytics');
+        }
+      } finally {
+        if (isMounted) {
+          setIsCardLoading(false);
+          setIsClicksLoading(false);
+        }
       }
     };
-    fetchCard();
-  }, [id, getCardById, navigate]);
 
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, getCardById, getCardClicks, navigate]);
+
+  const filteredClicks = useMemo(() => {
+    if (!clicks) return [];
+    if (timeRange === Infinity) return clicks;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - timeRange);
+    return clicks.filter(click => new Date(click.created_at) >= cutoffDate);
+  }, [clicks, timeRange]);
+
+  const clickCountsByType = useMemo(() => {
+    // Fix: Explicitly type the accumulator in `reduce` to ensure TypeScript
+    // correctly infers the types for the `counts` object and its values.
+    const counts = filteredClicks.reduce((acc: Record<string, number>, click) => {
+      const type = click.type.charAt(0).toUpperCase() + click.type.slice(1);
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count); // Sort descending for a more useful chart
+  }, [filteredClicks]);
+
+  const clickDataForChart = useMemo(() => {
+    const clicksByDate = filteredClicks.reduce((acc, click) => {
+      const date = new Date(click.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(clicksByDate)
+      .map(([date, clicks]) => ({ date, clicks }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [filteredClicks]);
+  
   const mockAnalytics: AnalyticsData = useMemo(() => ({
     totalViews: 258,
     uniqueScans: 89,
@@ -60,21 +123,26 @@ const AnalyticsPage: React.FC = () => {
     setAiInsights(insights);
     setIsLoading(false);
   };
+  
+  const timeRanges = [
+    { label: '7 Days', value: 7 }, { label: '14 Days', value: 14 },
+    { label: '30 Days', value: 30 }, { label: '60 Days', value: 60 },
+    { label: '90 Days', value: 90 }, { label: 'All Time', value: Infinity },
+  ];
 
-  // Fix: Show a spinner while the card data is being fetched.
   if (isCardLoading) {
     return <div className="flex justify-center items-center h-64"><Spinner /></div>;
   }
 
-  if (!card) return null;
+  if (!card) {
+    return null; 
+  }
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Fix: Use correct `full_name` property from the CardData interface. */}
       <h1 className="text-3xl font-bold text-text mb-2">Analytics for {card.full_name}</h1>
       <p className="text-muted mb-8">Understand your card's performance.</p>
 
-      {/* Basic Analytics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-card p-6 rounded-lg shadow-sm border border-slate-200">
           <h3 className="text-muted">Total Views</h3>
@@ -85,12 +153,11 @@ const AnalyticsPage: React.FC = () => {
           <p className="text-3xl font-bold">{mockAnalytics.uniqueScans}</p>
         </div>
         <div className="bg-card p-6 rounded-lg shadow-sm border border-slate-200">
-          <h3 className="text-muted">Avg. Time on Page</h3>
-          <p className="text-3xl font-bold">{mockAnalytics.timeOnPage}s</p>
+          <h3 className="text-muted">Total Clicks</h3>
+          <p className="text-3xl font-bold">{clicks.length}</p>
         </div>
       </div>
 
-      {/* Pro Analytics */}
       {user?.tier === UserTier.Pro ? (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -118,6 +185,53 @@ const AnalyticsPage: React.FC = () => {
                     </BarChart>
                 </ResponsiveContainer>
             </div>
+          </div>
+          
+          <div className="bg-card p-6 rounded-lg shadow-sm border border-slate-200 mb-8">
+            <h2 className="text-2xl font-bold mb-4">Click Analytics</h2>
+            <div className="flex flex-wrap gap-2 mb-6">
+                {timeRanges.map(range => (
+                    <button
+                        key={range.label}
+                        onClick={() => setTimeRange(range.value)}
+                        className={`px-3 py-1 text-sm font-semibold rounded-full transition ${timeRange === range.value ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                    >
+                        {range.label}
+                    </button>
+                ))}
+            </div>
+            {isClicksLoading ? <Spinner /> : (
+                filteredClicks.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <h3 className="font-semibold mb-4 text-center">Click Distribution by Type</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={clickCountsByType} layout="vertical" margin={{ left: 20 }}>
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" width={80} />
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="count" fill="#8B5CF6" name="Clicks" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div>
+                            <h3 className="font-semibold mb-4 text-center">Clicks Over Time</h3>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={clickDataForChart}>
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="clicks" fill="#10B981" name="Clicks" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-center text-muted py-10">No click data available for this period.</p>
+                )
+            )}
           </div>
           
           <div className="bg-card p-6 rounded-lg shadow-sm border border-slate-200">

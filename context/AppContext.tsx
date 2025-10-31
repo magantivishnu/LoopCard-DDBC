@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
-import { User, CardData, UserTier } from '../types';
+import { User, CardData, UserTier, Click } from '../types';
 
 type CardCreationData = Omit<CardData, 'id' | 'user_id' | 'qr_code_url' | 'created_at'>;
 
@@ -17,6 +17,9 @@ interface AppContextType {
   deleteCard: (cardId: string) => Promise<void>;
   getCardById: (cardId: string) => Promise<CardData | null>;
   uploadAsset: (uri: string) => Promise<string | null>;
+  updateUserTier: (newTier: UserTier) => Promise<void>;
+  trackClick: (cardId: string, type: string, targetUrl: string) => void;
+  getCardClicks: (cardId: string) => Promise<Click[]>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -27,7 +30,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [loading, setLoading] = useState(true);
 
   const fetchUserAndCards = useCallback(async (session: Session) => {
-    setLoading(true);
+    // setLoading(true); // Removed to prevent re-triggering loader on tab focus
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -81,14 +84,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const signUp = async (email: string, password: string, tier: UserTier) => {
+    const referralCode = localStorage.getItem('referralCode');
+
+    // Automatically assign Pro tier to specified test users for easier debugging and feature testing.
+    const testUserEmails = ['nitinrajkumar502@gmail.com'];
+    const finalTier = testUserEmails.includes(email.toLowerCase()) ? UserTier.Pro : tier;
+
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (data.user) {
         // A user profile is not created automatically, so we insert a new row.
         const { error: profileError } = await supabase
             .from('profiles')
-            .insert({ id: data.user.id, email: email, tier: tier });
+            .insert({ id: data.user.id, email: email, tier: finalTier });
         if (profileError) throw profileError;
+        
+        // If a referral code was used, handle it.
+        if (referralCode) {
+            console.log(`User ${data.user.id} signed up with referral code: ${referralCode}`);
+            // In a real app, you would now call a Supabase Edge Function
+            // to process the referral, e.g., credit both users.
+            // e.g., await supabase.functions.invoke('process-referral', { body: { referrerId: referralCode, newUserId: data.user.id } })
+            
+            // Clear the code after use
+            localStorage.removeItem('referralCode');
+        }
     }
     return data;
   }
@@ -168,8 +188,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return data as CardData;
   }, []);
 
+  const updateUserTier = async (newTier: UserTier) => {
+    if (!user) throw new Error("User not authenticated.");
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .update({ tier: newTier })
+        .eq('id', user.id)
+        .select()
+        .single();
+    
+    if (error) throw error;
+
+    setUser(prevUser => {
+        if (!prevUser) return null;
+        return { ...prevUser, tier: data.tier as UserTier };
+    });
+  };
+
+  const trackClick = async (cardId: string, type: string, targetUrl: string) => {
+    const { error } = await supabase
+      .from('clicks')
+      .insert({ card_id: cardId, type: type, target_url: targetUrl });
+  
+    if (error) {
+      console.error('Error tracking click:', error.message);
+    }
+  };
+
+  const getCardClicks = useCallback(async (cardId: string): Promise<Click[]> => {
+    const { data, error } = await supabase
+      .from('clicks')
+      .select('*')
+      .eq('card_id', cardId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching card clicks:', error.message);
+      return [];
+    }
+    return data;
+  }, []);
+
   return (
-    <AppContext.Provider value={{ user, cards, loading, login, signUp, logout, addCard, updateCard, deleteCard, getCardById, uploadAsset }}>
+    <AppContext.Provider value={{ user, cards, loading, login, signUp, logout, addCard, updateCard, deleteCard, getCardById, uploadAsset, updateUserTier, trackClick, getCardClicks }}>
       {children}
     </AppContext.Provider>
   );

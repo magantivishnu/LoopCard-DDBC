@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { AnalyticsData } from '../types';
 
 // Fix: Safely initialize GoogleGenAI client and check for API key.
@@ -39,5 +39,50 @@ export const generateAnalyticsInsights = async (analyticsData: AnalyticsData): P
   } catch (error) {
     console.error("Error generating insights from Gemini:", error);
     return "There was an error generating AI insights. Please try again later.";
+  }
+};
+
+export const suggestUsernames = async (
+  fullName: string,
+  role: string | null,
+  businessName: string | null,
+  platform: string
+): Promise<string[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const model = 'gemini-2.5-flash';
+
+  const prompt = `
+    Based on the following user details, suggest 3 creative and professional usernames for the social media platform "${platform}".
+    - Full Name: ${fullName}
+    - Role/Designation: ${role || 'Not provided'}
+    - Business Name: ${businessName || 'Not provided'}
+
+    The usernames should be short, memorable, and likely to be available.
+    Focus on variations of the name, role, and business.
+    Return ONLY a JSON array of strings with the suggestions.
+    Example: ["john.doe.dev", "johndoe_codes", "the_john_doe"]
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING,
+          },
+        },
+      },
+    });
+
+    const jsonStr = response.text.trim();
+    const suggestions = JSON.parse(jsonStr);
+    return Array.isArray(suggestions) ? suggestions : [];
+  } catch (error) {
+    console.error("Error generating username suggestions from Gemini:", error);
+    return [];
   }
 };

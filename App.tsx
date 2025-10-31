@@ -20,6 +20,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import AnalyticsLandingPage from './pages/AnalyticsLandingPage';
 import EditLandingPage from './pages/EditLandingPage';
+import QRScannerPage from './pages/QRScannerPage';
 
 const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex flex-col min-h-screen">
@@ -55,6 +56,7 @@ const AppRouter = () => {
             <Route path="/analytics/:id" element={<AnalyticsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/card/:id" element={<PublicCardViewPage />} />
+            <Route path="/scanner" element={<QRScannerPage />} />
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
         </MainLayout>

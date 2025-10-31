@@ -63,6 +63,14 @@ export interface AnalyticsData {
   heatmapData: { x: number; y: number; value: number }[];
 }
 
+export interface Click {
+  id: string;
+  created_at: string;
+  card_id: string;
+  type: string;
+  target_url: string;
+}
+
 // For Supabase client type-safety
 export type Database = {
   public: {
@@ -76,6 +84,11 @@ export type Database = {
         Row: { id: string; email: string; tier: string; };
         Insert: { id: string; email: string; tier: string; };
         Update: { tier?: string; };
+      };
+      clicks: {
+        Row: Click;
+        Insert: Omit<Click, 'id' | 'created_at'>;
+        Update: Partial<Click>;
       };
     };
   };

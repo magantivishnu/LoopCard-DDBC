@@ -61,7 +61,13 @@ const translationsData: Record<Locale, Record<string, string>> = {
     publicCard_whatsapp: "WhatsApp",
     publicCard_email: "Email",
     publicCard_website: "Website",
-    publicCard_gallery: "Gallery"
+    publicCard_gallery: "Gallery",
+    settings_invite_title: "Invite a Friend",
+    settings_invite_subtitle: "Share your unique link. When your friend signs up for Pro, you both get a month of Pro for free!",
+    settings_invite_copyLink: "Copy Link",
+    settings_invite_copied: "Copied!",
+    settings_upgradeToPro: "Upgrade to Pro",
+    settings_downgradeToFree: "Downgrade to Free",
   },
   te: {
     appName: "లూప్‌కార్డ్",
@@ -121,7 +127,13 @@ const translationsData: Record<Locale, Record<string, string>> = {
     publicCard_whatsapp: "వాట్సాప్",
     publicCard_email: "ఇమెయిల్",
     publicCard_website: "వెబ్‌సైట్",
-    publicCard_gallery: "గ్యాలరీ"
+    publicCard_gallery: "గ్యాలరీ",
+    settings_invite_title: "స్నేహితుడిని ఆహ్వానించండి",
+    settings_invite_subtitle: "మీ ప్రత్యేక లింక్‌ను పంచుకోండి. మీ స్నేహితుడు ప్రో కోసం సైన్ అప్ చేసినప్పుడు, మీ ఇద్దరికీ ఒక నెల ప్రో ఉచితంగా లభిస్తుంది!",
+    settings_invite_copyLink: "లింక్ కాపీ చేయండి",
+    settings_invite_copied: "కాపీ చేయబడింది!",
+    settings_upgradeToPro: "ప్రోకి అప్‌గ్రేడ్ చేయండి",
+    settings_downgradeToFree: "ఉచితానికి డౌన్‌గ్రేడ్ చేయండి",
   }
 };
 
