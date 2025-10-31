@@ -70,19 +70,17 @@ const AnalyticsPage: React.FC = () => {
     if (timeRange === Infinity) return clicks;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - timeRange);
-    // Fix: Using .getTime() for date comparison is more robust and resolves TypeScript errors
-    // related to performing arithmetic operations on Date objects.
     return clicks.filter(click => new Date(click.created_at).getTime() >= cutoffDate.getTime());
   }, [clicks, timeRange]);
 
   const clickCountsByType = useMemo(() => {
-    // Fix: Explicitly type the accumulator in `reduce` to ensure TypeScript
+    // Fix: Explicitly type the accumulator's initial value in `reduce` to ensure TypeScript
     // correctly infers the types for the `counts` object and its values.
-    const counts = filteredClicks.reduce((acc: Record<string, number>, click) => {
+    const counts = filteredClicks.reduce((acc, click) => {
       const type = click.type.charAt(0).toUpperCase() + click.type.slice(1);
       acc[type] = (acc[type] || 0) + 1;
       return acc;
-    }, {});
+    }, {} as Record<string, number>);
 
     return Object.entries(counts)
       .map(([name, count]) => ({ name, count }))

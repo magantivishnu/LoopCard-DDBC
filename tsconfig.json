@@ -19,5 +19,9 @@
     "**/*.ts",
     "**/*.tsx"
   ],
+  "exclude": [
+    "node_modules",
+    "screens"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
