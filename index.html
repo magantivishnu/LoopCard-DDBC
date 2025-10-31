@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoopCard: Digital Business Card Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: '#4338CA', // A slightly deeper indigo
+              secondary: '#059669', // A slightly deeper green
+              background: '#F8FAFC', // Lighter slate
+              card: '#FFFFFF',
+              text: '#0F172A', // Darker slate
+              muted: '#64748B', // Medium slate
+            },
+            keyframes: {
+              'fade-in': {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            },
+            animation: {
+              'fade-in': 'fade-in 0.5s ease-out forwards',
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.5",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.45.0",
+    "react-native": "https://aistudiocdn.com/react-native@^0.82.1",
+    "react-native-safe-area-context": "https://aistudiocdn.com/react-native-safe-area-context@^5.6.2",
+    "@expo/vector-icons": "https://aistudiocdn.com/@expo/vector-icons@^15.0.3",
+    "expo-image-picker": "https://aistudiocdn.com/expo-image-picker@^17.0.8"
+  }
+}
+</script>
+</head>
+  <body class="bg-background">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

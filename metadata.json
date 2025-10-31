@@ -1,0 +1,5 @@
+{
+  "name": "LoopCard: Digital Business Card Builder",
+  "description": "A mobile-first digital business card builder that allows users to create, customize, and share their professional identity seamlessly. Features include analytics, QR code generation, and multiple card management based on subscription tiers.",
+  "requestFramePermissions": []
+}
